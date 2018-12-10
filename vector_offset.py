@@ -102,6 +102,9 @@ def process_example(filename):
 
     sentences, ground_truth = preprocess_text(text)
 
+    if len(sentences) < 30:
+        return [], None, None
+
     sentences_vec = sent2vec_model.embed_sentences(sentences)
     ground_truth_vec = sent2vec_model.embed_sentence(ground_truth)
 
@@ -122,17 +125,16 @@ def process_example(filename):
         except ValueError:
             sentence_idx += 1
             continue
- 
+
         sentences_dist.append([sentence_idx, sentence_vec_dist,
                                 rouge_to_list(rouge_str)])
         sentence_idx += 1
 
-    # Sort sentences based on closest vector distance
-    #print(sentences_dist)
 
     if len(sentences_dist) == 0:
         return [], None, None
 
+    # Sort sentences based on closest vector distance
     sentences_dist.sort(key=lambda x: x[1])
     best_vector_idx = sentences_dist[0][0]
     sentences_vector_idx = []
