@@ -6,6 +6,9 @@
 #
 # Author: Mauricio Steinert
 #
+import sys
+sys.path.append("../pucrs-cc-tcc-2018/lib/python/")
+sys.path.append("../pucrs-cc-tcc-2018/lib/rouge/")
 
 import rouge
 import sent2vec
@@ -112,19 +115,24 @@ def process_example(filename):
     sentences_dist = []
 
     for sentence_vec in sentences_vec:
-        sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(sentence_vec, text_mean_diff_vec)))
+        sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(sentence_vec, text_mean_diff_vec[0])))
 
         try:
             rouge_str = rouge.get_scores(ground_truth, sentences[sentence_idx])
         except ValueError:
             sentence_idx += 1
             continue
-
+ 
         sentences_dist.append([sentence_idx, sentence_vec_dist,
                                 rouge_to_list(rouge_str)])
         sentence_idx += 1
 
     # Sort sentences based on closest vector distance
+    #print(sentences_dist)
+
+    if len(sentences_dist) == 0:
+        return [], None, None
+
     sentences_dist.sort(key=lambda x: x[1])
     best_vector_idx = sentences_dist[0][0]
     sentences_vector_idx = []
@@ -244,7 +252,7 @@ total_examples = len(files_list)
 
 
 for file in files_list:
-    if (file_idx % 300) == 0:
+    if (file_idx % 10) == 0:
         print("[" + str(file_idx / total_examples) + "]  Processing file " + file)
 
     try:
@@ -254,6 +262,9 @@ for file in files_list:
         log_file = open(parser.log_file_name + ".error", "a")
         log_file.write("Error processing file " + file)
         log_file.close()
+        continue
+
+    if len(stat) == 0:
         continue
 
     if best_vector_str == best_rouge_str:
