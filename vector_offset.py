@@ -241,10 +241,10 @@ stats = []
 summary_match = 0
 
 total_examples = len(files_list)
-file_step = total_examples / 1000
+
 
 for file in files_list:
-    if file_idx % file_step == 0:
+    if (file_idx % 300) == 0:
         print("[" + str(file_idx / total_examples) + "]  Processing file " + file)
 
     try:
@@ -252,7 +252,7 @@ for file in files_list:
         stats.append(stat)
     except TypeError:
         log_file = open(parser.log_file_name + ".error", "a")
-        log_file("Error processing file " + file)
+        log_file.write("Error processing file " + file)
         log_file.close()
         continue
 
