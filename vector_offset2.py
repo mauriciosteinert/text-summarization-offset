@@ -30,8 +30,8 @@ def preprocess_text(filename):
     text = open(filename, "r").read()
 
     sentences = text.lower().split("\n")
-    # text = text.replace("\n", "")
-    print("------------------------------------------------------------------------------")
+    print("\n------------------------------------------------------------------------------")
+    print("Filename = ", filename)
     print(sentences)
 
     return [], ""
