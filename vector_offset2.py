@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 
 
+import sys
+sys.path.append("../pucrs-cc-tcc-2018/lib/python/")
+sys.path.append("../pucrs-cc-tcc-2018/lib/rouge/")
+
 import argparse
 import os
 import sent2vec
