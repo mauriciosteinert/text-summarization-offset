@@ -9,11 +9,7 @@ import argparse
 import os
 import sent2vec
 import rouge
-
-
-rouge = rouge.Rouge()
-sent2vec_model = sent2vec.Sent2vecModel()
-
+import numpy as np
 
 
 def rouge_to_list(rouge_str):
@@ -64,7 +60,7 @@ def preprocess_text(filename):
             full_text.append(paragraph)
 
     # Separate text from ground-truth
-    sentences = []
+    sentences_text = []
     while full_text:
         sentence = full_text.pop(0)
 
@@ -73,7 +69,7 @@ def preprocess_text(filename):
         sentences.append(sentence)
 
     # Concatenate ground-truth value
-    ground_truth = ""
+    ground_truth_text = ""
 
     while full_text:
         sentence = full_text.pop(0)
@@ -81,32 +77,115 @@ def preprocess_text(filename):
         if sentence == "@highlight":
             continue
 
-        ground_truth += sentence + ". "
+        ground_truth_text += sentence + ". "
 
     # Discard sentences shorther than 30 characters
-    sentences = [sentence for sentence in sentences if len(sentence) >= 30]
+    sentences_text = [sentence for sentence in sentences if len(sentence) >= 30]
 
-    return sentences, ground_truth
+    sentences_vec = sent2vec_model.embed_sentences(sentences_text)
+    ground_truth_vec = sent2vec_model.embed_sentence(ground_truth_text)
+
+    return sentences_text, sentences_vec, ground_truth_text, ground_truth_vec
 
 
 
-def process_summary(sentences, ground_truth):
-    # Compute ROUGE scores for each sentence
+def generate_summary(filename):
+    sentences_text, sentences_vec, ground_truth_text, ground_truth_vec = preprocess_text(filename)
+    stat = []
+    global top_n_counter
 
-    for sentence in sentences:
+    # print("Sentences = ", sentences_text)
+    # print("Sentences vec = ", sentences_vec)
+    # print("Ground truth = ", ground_truth_text)
+    # print("Ground truth vec = ", ground_truth_vec)
+
+    if len(sentences_text) < 10:
+        return None
+
+    # Compute text mean without ground-truth
+    text_mean_vec = np.mean(np.vstack((sentences_vec, ground_truth_vec)), axis=0)
+
+    # Extract ground-truth from mean
+    text_mean_diff_vec = np.subtract(text_mean_vec, ground_truth_vec)
+
+
+    sentence_idx = 0
+    for sentence_vec in sentences_vec:
+        # Compute sentence distance from text text mean
+        sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(text_mean_diff_vec, sentence_vec)))
+
+        # Compute ROUGE scores for sentences
         try:
-            rouge_str = rouge.get_scores(ground_truth, sentence)
+            rouge_str = rouge.get_scores(ground_truth_text, sentences_text[sentence_idx])
         except ValueError:
-            log_file = open(parser.log_file_name + "-error", "a")
-            log_file.write("[" + file + "] Error computing ROUGE scores for sentence " + sentence + "\n")
-            log_file.close()
+            stat.append([sentence_idx, sentence_vec_dist, [[0, 0, 0], [0, 0, 0], [0, 0, 0]]])
+            sentence_idx += 1
             continue
 
+        stat.append([sentence_idx, sentence_vec_dist, rouge_to_list(rouge_str)])
+        sentence_idx += 1
+
+    # Compute vector summary
+    stat.sort(key=lambda x: x[1])
+    sentences_vector_idx = []
+    best_vector_str = ""
+
+    for sentence in stat:
+        if len(best_vector_str) > int(parser.max_summary_length):
+            break
+        best_vector_str += sentences_text[sentence[0]] + ". "
+        sentences_vector_idx.append(sentence[0])
+
+    # Compute ROUGE summary
+    stat.sort(key=lambda x: x[2][0], reverse=True)
+    sentences_rouge_idx = []
+    best_rouge_str = ""
+
+    for sentence in stat:
+        if len(best_rouge_str) > int(parser.max_summary_length):
+            break
+        best_rouge_str += sentences_text[sentence[0]] + ". "
+        sentences_rouge_idx.append(sentence[0])
+
+    log_file.write("-----------------------------------------------------------------\n")
+    log_file.write("Processing file " + str(filename) + "\n")
+    log_file.write("Best vector indexes = " + str(sentences_vector_idx) + "\n")
+    try:
+        log_file.write("ROUGE Scores = " + str(rouge_to_list(rouge.get_scores(ground_truth_text, best_vector_str))) + "\n")
+    except ValueError:
+        log_file_error.write("[" + filename + "] Error computing ROUGE score for summary vector\n")
+
+    log_file.write("Vector summary = " + str(best_vector_str) + "\n")
+    log_file.write("Best ROUGE indexes " + str(sentences_rouge_idx) + "\n")
+    log_file.write("ROUGE summary = " + str(best_rouge_str) + "\n")
+    try:
+        log_file.write("ROUGE Scores = " + str(rouge_to_list(rouge.get_scores(ground_truth_text, best_rouge_str))) + "\n")
+    except ValueError:
+        log_file_error.write("[" + filename + "] Error computing ROUGE score for ROUGE vector\n")
+
+
+    for sentence_idx in sentences_vector_idx:
+        for idx in range(0, top_n):
+            if sentence_idx in sentences_rouge_idx[:idx]:
+                top_n_counter[idx] += 1
+
+    try:
+        stat_vec = rouge_to_list(rouge.get_scores(ground_truth_text, best_vector_str))
+    except:
+        stat_vec = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+
+    try:
+        stat_rouge = rouge_to_list(rouge.get_scores(ground_truth_text, best_rouge_str))
+    except:
+        stat_rouge = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+
+    stats_vec.append(stat_vec)
+    stats_rouge.append(stat_rouge)
 
 
 
 def main():
-    parser = parse_args()
+    sent2vec_model.load_model(parser.word_vector_dictionary)
 
     file_list = os.listdir(parser.dataset_dir)
 
@@ -120,20 +199,46 @@ def main():
         print("[" + str(file_idx / total_files) + "] Processing file " + file)
         file_idx += 1
 
-        sentences, ground_truth = preprocess_text(parser.dataset_dir + "/" + file)
+        generate_summary(parser.dataset_dir + "/" + file)
 
-        # print("\n------------------------------------------------------------------------------")
-        # print("Sentences = ", sentences)
-        # print("Ground truth = ", ground_truth)
+    vec_mean = np.mean(stats_vec, axis=0)
+    vec_std = np.std(stats_vec, axis=0)
+    rouge_mean = np.mean(stats_rouge, axis=0)
+    rouge_std = np.std(stats_rouge, axis=0)
 
-        # Ignore texts shorter than 15 sentences
-        if len(sentences) < 10 or len(ground_truth) < 20:
-            log_file = open(parser.log_file_name + "-error", "a")
-            log_file.write("Ignoring file " + file + " due to short length.\n")
-            log_file.close()
-            continue
+    log_file.write("-----------------------------------------------------------------\n")
+    log_file.write("Vec mean = " + str(vec_mean) + "\n")
+    log_file.write("Vec std = " + str(vec_std) + "\n")
+    log_file.write("ROUGE mean = " + str(rouge_mean) + "\n")
+    log_file.write("ROUGE std = " + str(rouge_std) + "\n")
+    log_file.write("Common sentences = " + str(top_n_counter) + "\n")
+    log_file.write("Total of processed files = " + str(len(stats_vec)))
 
-        process_summary(sentences, ground_truth)
+    log_file.close()
+    log_file_error.close()
+
+
 
 if __name__ == "__main__":
+    parser = parse_args()
+
+
+    # Remove old log file
+    try:
+        os.remove(parser.log_file_name)
+        os.remove(parser.log_file_name + "-error")
+    except FileNotFoundError:
+        None
+
+
+    log_file = open(parser.log_file_name, "a")
+    log_file_error = open(parser.log_file_name + "-error", "a")
+    common_sentences = 0
+    top_n = 5
+    top_n_counter = np.zeros(top_n)
+
+    rouge = rouge.Rouge()
+    sent2vec_model = sent2vec.Sent2vecModel()
+    stats_vec = []
+    stats_rouge = []
     main()
