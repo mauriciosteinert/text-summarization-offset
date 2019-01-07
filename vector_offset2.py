@@ -112,7 +112,10 @@ def generate_summary(filename):
     sentence_idx = 0
     for sentence_vec in sentences_vec:
         # Compute sentence distance from text text mean
-        sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(text_mean_diff_vec, sentence_vec)))
+        sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(text_mean_diff_vec[0], sentence_vec)))
+        print(text_mean_diff_vec)
+        print(len(text_mean_diff_vec), len(sentence_vec))
+        print("Len Add = ", len(np.add(text_mean_diff_vec, sentence_vec)))
 
         # Compute ROUGE scores for sentences
         try:
@@ -163,6 +166,7 @@ def generate_summary(filename):
     except ValueError:
         log_file_error.write("[" + filename + "] Error computing ROUGE score for ROUGE vector\n")
 
+    log_file.write("Ground truth summary = " + ground_truth_text);
 
     for sentence_idx in sentences_vector_idx:
         for idx in range(0, top_n):
@@ -194,6 +198,8 @@ def main():
 
     total_files = len(file_list)
     file_idx = 0
+
+    log_file.write(str(parser))
 
     for file in file_list:
         print("[" + str(file_idx / total_files) + "] Processing file " + file)
@@ -233,8 +239,8 @@ if __name__ == "__main__":
 
     log_file = open(parser.log_file_name, "a")
     log_file_error = open(parser.log_file_name + "-error", "a")
-    common_sentences = 0
-    top_n = 5
+    #common_sentences = 0
+    top_n = 10
     top_n_counter = np.zeros(top_n)
 
     rouge = rouge.Rouge()
