@@ -113,9 +113,6 @@ def generate_summary(filename):
     for sentence_vec in sentences_vec:
         # Compute sentence distance from text text mean
         sentence_vec_dist = np.linalg.norm((text_mean_vec, np.add(text_mean_diff_vec[0], sentence_vec)))
-        print(text_mean_diff_vec)
-        print(len(text_mean_diff_vec), len(sentence_vec))
-        print("Len Add = ", len(np.add(text_mean_diff_vec, sentence_vec)))
 
         # Compute ROUGE scores for sentences
         try:
