@@ -34,6 +34,8 @@ def parse_args():
                         help='Output file name')
     parser.add_argument('--generate-tsne', metavar='generate_tsne',
                         help='Generate T-SNE visualization for each example')
+    parser.add_argument('--use-ground-truth', metavar='use_ground_truth',
+                        help='Use ground-truth value to compute summary')
     parser = parser.parse_args()
     return parser
 
@@ -103,10 +105,14 @@ def generate_summary(filename):
         return None
 
     # Compute text mean without ground-truth
-    text_mean_vec = np.mean(np.vstack((sentences_vec, ground_truth_vec)), axis=0)
+    if parser.use_ground_truth == "True":
+        text_mean_vec = np.mean(np.vstack((sentences_vec, ground_truth_vec)), axis=0)
+        text_mean_diff_vec = np.subtract(text_mean_vec, ground_truth_vec)
+    else:
+        text_mean_vec = np.mean(sentences_vec, axis=0)
+        text_mean_diff_vec = text_mean_vec
 
     # Extract ground-truth from mean
-    text_mean_diff_vec = np.subtract(text_mean_vec, ground_truth_vec)
 
 
     sentence_idx = 0
@@ -209,7 +215,7 @@ def main():
     rouge_mean = np.mean(stats_rouge, axis=0)
     rouge_std = np.std(stats_rouge, axis=0)
 
-    log_file.write("-----------------------------------------------------------------\n")
+    log_file.write("\n-----------------------------------------------------------------\n")
     log_file.write("Vec mean = " + str(vec_mean) + "\n")
     log_file.write("Vec std = " + str(vec_std) + "\n")
     log_file.write("ROUGE mean = " + str(rouge_mean) + "\n")
