@@ -36,6 +36,10 @@ def parse_args():
                         help='Generate T-SNE visualization for each example')
     parser.add_argument('--use-ground-truth', metavar='use_ground_truth',
                         help='Use ground-truth value to compute summary')
+    parser.add_argument('--mean-ground-truth', metavar='mean_ground_truth',
+                        help='Compute mean ground-truth difference from a group of examples')
+    parser.add_argument('--mean-ground-truth-percent', metavar='mean_ground_truth_percent',
+                        help='Percentage of examples to use for computing ground-truth offset')
     parser = parser.parse_args()
     return parser
 
@@ -90,8 +94,23 @@ def preprocess_text(filename):
     return sentences_text, sentences_vec, ground_truth_text, ground_truth_vec
 
 
+def compute_global_offset(filename_list):
+    global global_offset_list
+    file_idx = 0
+    total_files = len(filename_list)
+
+    for filename in filename_list:
+        print("[" + str(file_idx / total_files) + "] Processing offset of file " + filename)
+        sentences_text, sentences_vec, ground_truth_text, ground_truth_vec = preprocess_text(parser.dataset_dir + "/" + filename)
+        file_idx += 1
+        text_mean_vec = np.mean(sentences_vec, axis=0)
+        text_mean_diff_vec = np.subtract(text_mean_vec, ground_truth_vec)
+        global_offset_list.append(text_mean_diff_vec)
+
+
 
 def generate_summary(filename):
+    global global_offset_mean
     sentences_text, sentences_vec, ground_truth_text, ground_truth_vec = preprocess_text(filename)
     stat = []
     global top_n_counter
@@ -104,16 +123,16 @@ def generate_summary(filename):
     if len(sentences_text) < 10:
         return None
 
+    text_mean_vec = np.mean(sentences_vec, axis=0)
+
     # Compute text mean without ground-truth
     if parser.use_ground_truth == "True":
-        text_mean_vec = np.mean(np.vstack((sentences_vec, ground_truth_vec)), axis=0)
         text_mean_diff_vec = np.subtract(text_mean_vec, ground_truth_vec)
     else:
-        text_mean_vec = np.mean(sentences_vec, axis=0)
         text_mean_diff_vec = text_mean_vec
 
-    # Extract ground-truth from mean
-
+    if parser.mean_ground_truth == "True":
+        text_mean_diff_vec = np.subtract(text_mean_vec, global_offset_mean)
 
     sentence_idx = 0
     for sentence_vec in sentences_vec:
@@ -192,12 +211,23 @@ def generate_summary(filename):
 
 
 def main():
+    global global_offset_mean
+
     sent2vec_model.load_model(parser.word_vector_dictionary)
 
     file_list = os.listdir(parser.dataset_dir)
 
     if parser.process_n_examples != None:
         file_list = file_list[:int(parser.process_n_examples)]
+
+    if parser.mean_ground_truth == "True":
+        total_train_examples = np.floor((int(parser.mean_ground_truth_percent) / 100) * len(file_list))
+        print("Total of train examples = ", total_train_examples)
+        print("Total of test examples = ", len(file_list[int(total_train_examples) + 1:]))
+        compute_global_offset(file_list[:int(total_train_examples)])
+        global_offset_mean = np.mean(global_offset_list, axis=0)
+        file_list = file_list[int(total_train_examples):]
+
 
     total_files = len(file_list)
     file_idx = 0
@@ -228,6 +258,7 @@ def main():
 
 
 
+
 if __name__ == "__main__":
     parser = parse_args()
 
@@ -245,6 +276,8 @@ if __name__ == "__main__":
     #common_sentences = 0
     top_n = 10
     top_n_counter = np.zeros(top_n)
+    global_offset_list = []
+    global_offset_mean = 0
 
     rouge = rouge.Rouge()
     sent2vec_model = sent2vec.Sent2vecModel()
