@@ -24,22 +24,34 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Parser')
     parser.add_argument('--process-n-examples', metavar='process_n_examples',
                         help='Total of examples to process from data set directory')
+
+    parser.add_argument('--process-single-example', metavar='process_single_example',
+                        help='Process a specific file')
+
     parser.add_argument('--dataset-dir', metavar='dataset_dir',
                         help='Data set directory with examples from CNN/Dailyail')
+
     parser.add_argument('--word-vector-dictionary', metavar='word_vector_dictionary',
                         help='Word vector dictionary to use')
+
     parser.add_argument('--max-summary-length', metavar='max_summary_length',
                         help='Maximum number of characters in summary')
+
     parser.add_argument('--log-file-name', metavar='log_file_name',
                         help='Output file name')
+
     parser.add_argument('--generate-tsne', metavar='generate_tsne',
                         help='Generate T-SNE visualization for each example')
+
     parser.add_argument('--use-ground-truth', metavar='use_ground_truth',
                         help='Use ground-truth value to compute summary')
+
     parser.add_argument('--mean-ground-truth', metavar='mean_ground_truth',
                         help='Compute mean ground-truth difference from a group of examples')
+
     parser.add_argument('--mean-ground-truth-percent', metavar='mean_ground_truth_percent',
                         help='Percentage of examples to use for computing ground-truth offset')
+
     parser = parser.parse_args()
     return parser
 
@@ -67,15 +79,19 @@ def preprocess_text(filename):
 
     # Separate text from ground-truth
     sentences_text = []
+
+
     while full_text:
         sentence = full_text.pop(0)
 
         if sentence == "@highlight":
             break
-        sentences.append(sentence)
+        sentences_text.append(sentence)
+
 
     # Concatenate ground-truth value
     ground_truth_text = ""
+
 
     while full_text:
         sentence = full_text.pop(0)
@@ -86,7 +102,7 @@ def preprocess_text(filename):
         ground_truth_text += sentence + ". "
 
     # Discard sentences shorther than 30 characters
-    sentences_text = [sentence for sentence in sentences if len(sentence) >= 30]
+    sentences_text = [sentence for sentence in sentences_text if len(sentence) >= 30]
 
     sentences_vec = sent2vec_model.embed_sentences(sentences_text)
     ground_truth_vec = sent2vec_model.embed_sentence(ground_truth_text)
@@ -158,8 +174,17 @@ def generate_summary(filename):
     for sentence in stat:
         if len(best_vector_str) > int(parser.max_summary_length):
             break
+        # print("sentence idx = ", sentence[0])
+        # print("vector str = ", best_vector_str)
         best_vector_str += sentences_text[sentence[0]] + ". "
         sentences_vector_idx.append(sentence[0])
+
+    # print("Vector final = ", best_vector_str)
+
+    # idx = 0
+    # for sentence in sentences_text:
+    #     print(idx, sentence)
+    #     idx += 1
 
     # Compute ROUGE summary
     stat.sort(key=lambda x: x[2][0], reverse=True)
@@ -228,6 +253,8 @@ def main():
         global_offset_mean = np.mean(global_offset_list, axis=0)
         file_list = file_list[int(total_train_examples):]
 
+    if parser.process_single_example != None:
+        file_list = [parser.process_single_example]
 
     total_files = len(file_list)
     file_idx = 0
