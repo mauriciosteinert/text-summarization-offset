@@ -110,7 +110,12 @@ def preprocess_text(filename):
 
 
     # Discard sentences shorther than 30 characters
-    sentences_text = [sentence for sentence in sentences_text if len(sentence) >= 30]
+    sentences_text = [sentence for sentence in sentences_text if len(sentence) >= 30 and len(sentence) < 5000]
+
+#    idx=0
+#    for s in sentences_text:
+#      print(idx, s)
+#      idx+=1
 
     if len(sentences_text) == 0:
         return [], [], "", []
@@ -214,7 +219,7 @@ def generate_summary(filename):
         best_rouge_str += sentences_text[sentence[0]] + ". "
         sentences_rouge_idx.append(sentence[0])
 
-    log_file.write("-----------------------------------------------------------------\n")
+    log_file.write("\n\n-----------------------------------------------------------------\n")
     log_file.write("Processing file " + str(filename) + "\n")
     log_file.write("Best vector indexes = " + str(sentences_vector_idx) + "\n")
     try:
