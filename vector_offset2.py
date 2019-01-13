@@ -101,6 +101,21 @@ def preprocess_text(filename):
 
         ground_truth_text += sentence + ". "
 
+    idx = 0
+    for s in sentences_text:
+        print(idx, s)
+        idx += 1
+
+
+    # Break paragraphs in sentences
+    full_text_str = ""
+    for s in sentences_text:
+        full_text_str += s
+
+    print(full_text_str)
+    sentences_text = full_text_str.split(".")
+
+
     # Discard sentences shorther than 30 characters
     sentences_text = [sentence for sentence in sentences_text if len(sentence) >= 30]
 
